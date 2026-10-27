@@ -1,0 +1,48 @@
+name: Build InfinityCore PoCs
+
+on:
+  push:
+    paths:
+      - "**/*.c"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build all PoCs (dynamic and static)
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          SOURCES="
+            timer/CVE-2026-98260-ubuntu.c
+            signal/CVE-2026-98256-ubuntu.c
+            mm/CVE-2026-89754-ubuntu.c
+            futex/CVE-2026-80775-ubuntu.c
+            sched/CVE-2026-98385-arch.c
+            slab/CVE-2026-97941-arch.c
+          "
+          for src in $SOURCES; do
+            name="$(basename "$src" .c)"
+            echo "== Building $src =="
+            gcc -O2 -Wall -o "dist/$name" "$src" -pthread
+            gcc -O2 -static -o "dist/$name-static" "$src" -pthread
+          done
+          ls -lh dist/
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: infinitycore-binaries
+          path: dist/
+          if-no-files-found: error
